@@ -147,39 +147,21 @@ export function WorldScene({ floorId, playerName, playerField }: WorldSceneProps
   const isMovingRef    = useRef(false);
   const keysRef        = useRef(new Set<string>());
   const prevNearRef    = useRef<string | null>(null);
+  const nearDataRef    = useRef<{ type: string; id?: string } | null>(null);
   const stairCooldown  = useRef(false);
 
   // 상호작용 핸들러 (항상 최신 참조 유지)
   const interactRef = useRef(() => {});
   interactRef.current = () => {
-    const tx = posRef.current.x;
-    const tz = posRef.current.z;
+    const near = nearDataRef.current;
+    if (!near) return;
 
-    // 1. 캐릭터 상호작용 우선
-    const demoCharacters = [
-      { id: 'user1', name: 'snowshower', x: spawn.x + 3.5, z: spawn.y + 0.5 },
-      { id: 'user2', name: 'soojin', x: spawn.x + 3.5, z: spawn.y + 2.5 },
-    ];
-    for (const char of demoCharacters) {
-      const dist = Math.sqrt((tx - char.x) ** 2 + (tz - char.z) ** 2);
-      if (dist <= INTERACTION_CONFIG.CHARACTER_INTERACT_RADIUS) {
-        mapEvents.emit('INTERACT_CHARACTER', { memberId: char.id });
-        return;
-      }
-    }
-
-    // 2. 오브젝트 상호작용
-    const itx = Math.floor(tx);
-    const itz = Math.floor(tz);
-    for (const obj of objects) {
-      const radius = PROXIMITY[obj.type] ?? -1;
-      if (radius < 0) continue;
-      const dist = Math.max(Math.abs(itx - obj.x), Math.abs(itz - obj.y));
-      if (dist <= radius) {
-        if (obj.type === 'BULLETIN') mapEvents.emit('INTERACT_BULLETIN');
-        if (obj.type === 'PORTAL')   mapEvents.emit('INTERACT_PORTAL', { floorId });
-        return;
-      }
+    if (near.type === 'CHARACTER' && near.id) {
+      mapEvents.emit('INTERACT_CHARACTER', { memberId: near.id });
+    } else if (near.type === 'BULLETIN') {
+      mapEvents.emit('INTERACT_BULLETIN');
+    } else if (near.type === 'PORTAL') {
+      mapEvents.emit('INTERACT_PORTAL', { floorId });
     }
   };
 
@@ -288,10 +270,13 @@ export function WorldScene({ floorId, playerName, playerField }: WorldSceneProps
       if (nearType === 'WELL')            mapEvents.emit('NEAR_WELL');
 
       if (nearChar) {
+        nearDataRef.current = { type: 'CHARACTER', id: nearChar.id };
         mapEvents.emit('NEAR_OBJECT', { type: 'CHARACTER', label: `[E] ${nearChar.name} 프로필` });
       } else if (nearObj && nearType !== 'DECORATION') {
+        nearDataRef.current = { type: nearType };
         mapEvents.emit('NEAR_OBJECT', { type: nearType ?? '', label: hintText(nearType ?? '') });
       } else {
+        nearDataRef.current = null;
         mapEvents.emit('LEAVE_OBJECT');
       }
 

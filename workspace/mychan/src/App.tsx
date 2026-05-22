@@ -28,19 +28,9 @@ export default function App() {
 
   useEffect(() => {
     if (!isLoggedIn) return;
-    const unsubNearChar = mapEvents.on('NEAR_CHARACTER', ({ memberId }) => {
-      // Logic for E key is in WorldScene, but we could use this for showing a hint
-    });
-    const unsubNearWell = mapEvents.on('NEAR_WELL', () => setNearWell(true));
-    const unsubLeaveWell = mapEvents.on('LEAVE_WELL', () => setNearWell(false));
-    const unsubBulletin = mapEvents.on('INTERACT_BULLETIN', () => setBulletinOpen(true));
-
-    return () => {
-      unsubNearChar();
-      unsubNearWell();
-      unsubLeaveWell();
-      unsubBulletin();
-    };
+    // MapRenderer props already handle most events. 
+    // We only need to listen here if we want to do something outside of MapRenderer.
+    return () => {};
   }, [isLoggedIn]);
 
   const crewName    = member?.crewName ?? 'you';
