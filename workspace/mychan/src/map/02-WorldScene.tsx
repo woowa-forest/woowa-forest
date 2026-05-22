@@ -273,8 +273,8 @@ export function WorldScene({ floorId, playerName, playerField }: WorldSceneProps
         nearDataRef.current = { type: 'CHARACTER', id: nearChar.id };
         mapEvents.emit('NEAR_OBJECT', { type: 'CHARACTER', label: `[E] ${nearChar.name} 프로필` });
       } else if (nearObj && nearType !== 'DECORATION') {
-        nearDataRef.current = { type: nearType };
-        mapEvents.emit('NEAR_OBJECT', { type: nearType ?? '', label: hintText(nearType ?? '') });
+        nearDataRef.current = { type: nearObj.type };
+        mapEvents.emit('NEAR_OBJECT', { type: nearObj.type, label: hintText(nearObj.type) });
       } else {
         nearDataRef.current = null;
         mapEvents.emit('LEAVE_OBJECT');
