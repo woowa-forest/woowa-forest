@@ -1,13 +1,21 @@
 import { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { MapRenderer } from './map/01-MapRenderer';
+import { LandingPage } from './pages/LandingPage';
+import { MyPageModal } from './components/MyPageModal';
+import { useAuthStore } from './store/useAuthStore';
+import { VILLAGE_FLOOR } from '@shared/types/01-member';
 
 const spring = { type: 'spring' as const, stiffness: 340, damping: 28 };
 
 export default function App() {
+  const member    = useAuthStore(s => s.member);
+  const isLoggedIn = useAuthStore(s => s.isLoggedIn);
+
   const [nearWell,     setNearWell]     = useState(false);
   const [bulletinOpen, setBulletinOpen] = useState(false);
-  const [currentFloor, setCurrentFloor] = useState(12);
+  const [myPageOpen,   setMyPageOpen]   = useState(false);
+  const [currentFloor, setCurrentFloor] = useState<number | null>(null);
   const [chatInput,    setChatInput]    = useState('');
   const [messages, setMessages] = useState<{ name: string; text: string; time: string }[]>([
     { name: 'snowshower', text: '점심 뭐 먹지... 🍜', time: '12:30' },
@@ -16,11 +24,16 @@ export default function App() {
   const [activeTab, setActiveTab] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const crewName    = member?.crewName ?? 'you';
+  const field       = member?.field    ?? 'FE';
+  const initFloor   = member ? VILLAGE_FLOOR[member.village] : undefined;
+  const displayFloor = currentFloor ?? initFloor ?? 12;
+
   const sendMessage = () => {
     if (!chatInput.trim()) return;
     const now  = new Date();
     const time = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
-    setMessages(m => [...m, { name: 'mychan', text: chatInput, time }]);
+    setMessages(m => [...m, { name: crewName, text: chatInput, time }]);
     setChatInput('');
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
   };
@@ -37,6 +50,16 @@ export default function App() {
     잡담: { bg: '#fff3e0', color: '#e65100' },
   };
 
+  if (!isLoggedIn) {
+    return (
+      <LandingPage onEnter={() => {
+        setCurrentFloor(null);
+        setNearWell(false);
+        setBulletinOpen(false);
+      }} />
+    );
+  }
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -50,8 +73,9 @@ export default function App() {
     }}>
 
       <MapRenderer
-        playerName="mychan"
-        playerField="FE"
+        playerName={crewName}
+        playerField={field}
+        initialFloor={initFloor}
         onNearWell={() => setNearWell(true)}
         onLeaveWell={() => setNearWell(false)}
         onInteractBulletin={() => setBulletinOpen(v => !v)}
@@ -61,6 +85,35 @@ export default function App() {
           setNearWell(false);
         }}
       />
+
+      {/* 내 정보 버튼 (우상단) */}
+      <motion.button
+        onClick={() => setMyPageOpen(true)}
+        whileHover={{ scale: 1.06 }}
+        whileTap={{ scale: 0.94 }}
+        style={{
+          position: 'fixed', top: 16, right: 16,
+          background: 'rgba(45,27,14,0.95)',
+          border: '2px solid #5c3d2e',
+          borderRadius: 10,
+          padding: '8px 14px',
+          display: 'flex', alignItems: 'center', gap: 8,
+          cursor: 'pointer',
+          boxShadow: '0 4px 20px #000a',
+          backdropFilter: 'blur(6px)',
+          zIndex: 50,
+        }}
+      >
+        <span style={{ fontSize: 16 }}>🧑‍💻</span>
+        <div style={{ textAlign: 'left' }}>
+          <div style={{ fontFamily: "'DotGothic16', monospace", fontSize: 12, color: '#FFF8E7', letterSpacing: 1 }}>
+            {crewName}
+          </div>
+          <div style={{ fontSize: 10, color: '#c8a878', fontFamily: "'Noto Sans KR', sans-serif" }}>
+            🪙 {member?.wooMaBalance.toLocaleString()}
+          </div>
+        </div>
+      </motion.button>
 
       {/* ── 우물가 채팅창 ── */}
       <AnimatePresence>
@@ -98,7 +151,7 @@ export default function App() {
                 style={{ fontSize: 16, display: 'inline-block' }}
               >🪣</motion.span>
               <span style={{ color: '#FFF8E7', fontFamily: "'DotGothic16', monospace", fontSize: 13, flex: 1 }}>
-                우물가 채팅 — {currentFloor}층
+                우물가 채팅 — {displayFloor}층
               </span>
               <span style={{ fontSize: 10, color: '#a07858', fontFamily: "'DotGothic16', monospace" }}>
                 {messages.length}명
@@ -109,7 +162,7 @@ export default function App() {
             <div style={{ height: 160, overflowY: 'auto', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <AnimatePresence initial={false}>
                 {messages.map((m, i) => {
-                  const isMe = m.name === 'mychan';
+                  const isMe = m.name === crewName;
                   return (
                     <motion.div
                       key={i}
@@ -219,7 +272,7 @@ export default function App() {
               {/* 헤더 */}
               <div style={{ background: 'linear-gradient(90deg, #c8a05e, #b8904e)', padding: '13px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontFamily: "'DotGothic16', monospace", fontSize: 16, color: '#2D1B0E' }}>
-                  📋 게시판 — {currentFloor}F
+                  📋 게시판 — {displayFloor}F
                 </span>
                 <motion.button
                   onClick={() => setBulletinOpen(false)}
@@ -329,6 +382,13 @@ export default function App() {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── 내 정보 모달 ── */}
+      <AnimatePresence>
+        {myPageOpen && (
+          <MyPageModal onClose={() => setMyPageOpen(false)} />
         )}
       </AnimatePresence>
     </div>

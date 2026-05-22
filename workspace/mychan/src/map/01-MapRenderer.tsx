@@ -7,8 +7,9 @@ import { WorldScene } from './02-WorldScene';
 import { mapEvents } from './mapEvents';
 
 interface MapRendererProps {
-  playerName?:  string;
-  playerField?: string;
+  playerName?:   string;
+  playerField?:  string;
+  initialFloor?: number;
   onNearWell?:          () => void;
   onLeaveWell?:         () => void;
   onInteractBulletin?:  () => void;
@@ -18,12 +19,13 @@ interface MapRendererProps {
 export function MapRenderer({
   playerName       = 'you',
   playerField      = 'FE',
+  initialFloor,
   onNearWell,
   onLeaveWell,
   onInteractBulletin,
   onFloorChange,
 }: MapRendererProps) {
-  const [floorId,      setFloorId]      = useState(DEFAULT_FLOOR);
+  const [floorId,      setFloorId]      = useState(initialFloor ?? DEFAULT_FLOOR);
   const [transitioning, setTransitioning] = useState(false);
   const [transFloorName, setTransFloorName] = useState('');
   const [hintText,     setHintText]     = useState('');
@@ -102,7 +104,7 @@ export function MapRenderer({
           boxShadow: `0 2px 12px ${theme.accentColor}88`,
           letterSpacing: 1,
         }}>
-          {floorId}F　{FLOORS[floorId]?.name ?? ''}
+          {floorId}F　{floorId === 11 ? '구리 & 안드로이드' : floorId === 12 ? '태초 & 프론트엔드' : '뽀롱 & 둠바'}
         </div>
 
         {/* 조작 힌트 바 (하단 고정) */}
@@ -215,7 +217,7 @@ export function MapRenderer({
               transition: 'all 0.3s ease',
               boxShadow: active ? `0 2px 8px ${t.accentColor}88` : 'none',
             }}>
-              {fId}F {f?.name ?? ''}
+              {fId}F　{fId === 11 ? '구리 & 안드로이드' : fId === 12 ? '태초 & 프론트엔드' : '뽀롱 & 둠바'}
             </div>
           );
         })}
