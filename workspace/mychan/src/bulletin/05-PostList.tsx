@@ -20,7 +20,7 @@ export function PostList({ floor, onPostClick }: Props) {
   const [sort,   setSort]   = useState<SortOption>('latest');
   const [status, setStatus] = useState<StatusFilter>('ALL');
 
-  const posts = getPosts(floor, tag, sort, status);
+  const posts = getPosts(floor as any, tag, sort, status);
 
   const TAG_STYLE: Record<PostTag, { bg: string; color: string }> = {
     QUESTION: { bg: '#e3f2fd', color: '#1565c0' },

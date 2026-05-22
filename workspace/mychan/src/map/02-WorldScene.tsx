@@ -335,7 +335,7 @@ export function WorldScene({ floorId, playerName, playerField }: WorldSceneProps
         facingRef={facingRef}
         name={playerName}
         field={playerField}
-        emoji={activeEmojis.find(e => e.memberId === member?.id)?.emoji}
+        emoji={activeEmojis.find(e => e.memberId === member?.id)?.emoji || undefined}
       />
 
       {/* 다른 크루들 (데모용 고정 위치) */}
@@ -345,7 +345,7 @@ export function WorldScene({ floorId, playerName, playerField }: WorldSceneProps
         facingRef={{ current: -Math.PI / 2 }}
         name="snowshower"
         field="BE"
-        emoji={activeEmojis.find(e => e.memberId === 'user1')?.emoji}
+        emoji={activeEmojis.find(e => e.memberId === 'user1')?.emoji || undefined}
       />
       <Character3D
         posRef={{ current: { x: spawn.x + 3.5, z: spawn.y + 2.5 } }}
@@ -353,7 +353,7 @@ export function WorldScene({ floorId, playerName, playerField }: WorldSceneProps
         facingRef={{ current: -Math.PI / 2 }}
         name="soojin"
         field="BE"
-        emoji={activeEmojis.find(e => e.memberId === 'user2')?.emoji}
+        emoji={activeEmojis.find(e => e.memberId === 'user2')?.emoji || undefined}
       />
 
       {/* 카메라 */}

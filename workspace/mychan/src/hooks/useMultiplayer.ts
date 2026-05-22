@@ -31,8 +31,10 @@ export function useMultiplayer(floorId: number, currentMember: PlayerState | nul
       
       Object.keys(state).forEach((key) => {
         if (key !== currentMember.memberId) {
-          // 최신 상태값 가져오기
-          newPlayers[key] = state[key][0] as PlayerState;
+          const userStates = state[key] as any[];
+          if (userStates && userStates.length > 0) {
+            newPlayers[key] = userStates[0] as PlayerState;
+          }
         }
       });
       setPlayers(newPlayers);
