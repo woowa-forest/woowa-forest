@@ -1,9 +1,8 @@
-// 맵 ↔ React 간 이벤트 버스
-// Phaser scene에서 emit, React 컴포넌트에서 on/off
-
 type MapEventHandlers = {
   NEAR_WELL: () => void;
   LEAVE_WELL: () => void;
+  NEAR_OBJECT: (payload: { type: string; label: string }) => void;
+  LEAVE_OBJECT: () => void;
   INTERACT_BULLETIN: () => void;
   INTERACT_PORTAL: (payload: { floorId: number }) => void;
   FLOOR_CHANGED: (payload: { toFloor: number }) => void;
