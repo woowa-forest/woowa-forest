@@ -6,11 +6,14 @@ import { TILE } from '@shared/types/02-map';
 import type { TileValue } from '@shared/types/02-map';
 import { MAP_WIDTH, MAP_HEIGHT } from '@shared/constants/01-floors';
 import { OBJECTS_BY_FLOOR, SPAWN_BY_FLOOR } from '@shared/constants/02-villages';
+import { INTERACTION_CONFIG } from '@shared/constants/03-interaction';
 import { buildTileMap, isWalkable, canOccupy, FLOOR_THEME_3D } from './03-TileMap';
 import { Objects3D, PROXIMITY } from './04-Objects3D';
 import { LowPolyTree } from './04-Objects3D';
 import { Character3D } from './05-Character3D';
 import { mapEvents } from './mapEvents';
+import { useInteractionStore } from '../store/useInteractionStore';
+import { useAuthStore } from '../store/useAuthStore';
 
 // ── 힌트 텍스트 ───────────────────────────────────────────────
 function hintText(type: string): string {
@@ -131,9 +134,12 @@ interface WorldSceneProps {
 }
 
 export function WorldScene({ floorId, playerName, playerField }: WorldSceneProps) {
+  const member  = useAuthStore(s => s.member);
   const theme   = FLOOR_THEME_3D[floorId] ?? FLOOR_THEME_3D[12];
   const objects = OBJECTS_BY_FLOOR[floorId] ?? [];
   const spawn   = SPAWN_BY_FLOOR[floorId]   ?? { x: 22, y: 12 };
+
+  const activeEmojis = useInteractionStore(s => s.activeEmojis);
 
   const tileMap        = useMemo(() => buildTileMap(floorId), [floorId]);
   const posRef         = useRef({ x: spawn.x + 0.5, z: spawn.y + 0.5 });
@@ -146,12 +152,29 @@ export function WorldScene({ floorId, playerName, playerField }: WorldSceneProps
   // 상호작용 핸들러 (항상 최신 참조 유지)
   const interactRef = useRef(() => {});
   interactRef.current = () => {
-    const tx = Math.floor(posRef.current.x);
-    const tz = Math.floor(posRef.current.z);
+    const tx = posRef.current.x;
+    const tz = posRef.current.z;
+
+    // 1. 캐릭터 상호작용 우선
+    const demoCharacters = [
+      { id: 'user1', name: 'snowshower', x: spawn.x + 3.5, z: spawn.y + 0.5 },
+      { id: 'user2', name: 'soojin', x: spawn.x + 3.5, z: spawn.y + 2.5 },
+    ];
+    for (const char of demoCharacters) {
+      const dist = Math.sqrt((tx - char.x) ** 2 + (tz - char.z) ** 2);
+      if (dist <= INTERACTION_CONFIG.CHARACTER_INTERACT_RADIUS) {
+        mapEvents.emit('INTERACT_CHARACTER', { memberId: char.id });
+        return;
+      }
+    }
+
+    // 2. 오브젝트 상호작용
+    const itx = Math.floor(tx);
+    const itz = Math.floor(tz);
     for (const obj of objects) {
       const radius = PROXIMITY[obj.type] ?? -1;
       if (radius < 0) continue;
-      const dist = Math.max(Math.abs(tx - obj.x), Math.abs(tz - obj.y));
+      const dist = Math.max(Math.abs(itx - obj.x), Math.abs(itz - obj.y));
       if (dist <= radius) {
         if (obj.type === 'BULLETIN') mapEvents.emit('INTERACT_BULLETIN');
         if (obj.type === 'PORTAL')   mapEvents.emit('INTERACT_PORTAL', { floorId });
@@ -228,27 +251,45 @@ export function WorldScene({ floorId, playerName, playerField }: WorldSceneProps
     }
 
     // ── 근접 감지 ──────────────────────────────────────────────
-    const tx = Math.floor(posRef.current.x);
-    const tz = Math.floor(posRef.current.z);
+    const { x: tx, z: tz } = posRef.current;
+    const itx = Math.floor(tx);
+    const itz = Math.floor(tz);
     let nearObj = null;
     let minDist = Infinity;
 
+    // 1. 캐릭터 감지 우선
+    const demoCharacters = [
+      { id: 'user1', name: 'snowshower', x: spawn.x + 3.5, z: spawn.y + 0.5 },
+      { id: 'user2', name: 'soojin', x: spawn.x + 3.5, z: spawn.y + 2.5 },
+    ];
+    let nearChar = null;
+    for (const char of demoCharacters) {
+      const dist = Math.sqrt((tx - char.x) ** 2 + (tz - char.z) ** 2);
+      if (dist <= INTERACTION_CONFIG.CHARACTER_INTERACT_RADIUS) {
+        nearChar = char;
+        break;
+      }
+    }
+
+    // 2. 오브젝트 감지
     for (const obj of objects) {
       const radius = PROXIMITY[obj.type] ?? -1;
       if (radius < 0) continue;
-      const dist = Math.max(Math.abs(tx - obj.x), Math.abs(tz - obj.y));
+      const dist = Math.max(Math.abs(itx - obj.x), Math.abs(itz - obj.y));
       if (dist <= radius && dist < minDist) {
         nearObj = obj;
         minDist = dist;
       }
     }
 
-    const nearType = nearObj?.type ?? null;
+    const nearType = nearChar ? 'CHARACTER' : (nearObj?.type ?? null);
     if (nearType !== prevNearRef.current) {
       if (prevNearRef.current === 'WELL') mapEvents.emit('LEAVE_WELL');
       if (nearType === 'WELL')            mapEvents.emit('NEAR_WELL');
 
-      if (nearObj && nearType !== 'DECORATION') {
+      if (nearChar) {
+        mapEvents.emit('NEAR_OBJECT', { type: 'CHARACTER', label: `[E] ${nearChar.name} 프로필` });
+      } else if (nearObj && nearType !== 'DECORATION') {
         mapEvents.emit('NEAR_OBJECT', { type: nearType ?? '', label: hintText(nearType ?? '') });
       } else {
         mapEvents.emit('LEAVE_OBJECT');
@@ -309,6 +350,25 @@ export function WorldScene({ floorId, playerName, playerField }: WorldSceneProps
         facingRef={facingRef}
         name={playerName}
         field={playerField}
+        emoji={activeEmojis.find(e => e.memberId === member?.id)?.emoji}
+      />
+
+      {/* 다른 크루들 (데모용 고정 위치) */}
+      <Character3D
+        posRef={{ current: { x: spawn.x + 3.5, z: spawn.y + 0.5 } }}
+        isMovingRef={{ current: false }}
+        facingRef={{ current: -Math.PI / 2 }}
+        name="snowshower"
+        field="BE"
+        emoji={activeEmojis.find(e => e.memberId === 'user1')?.emoji}
+      />
+      <Character3D
+        posRef={{ current: { x: spawn.x + 3.5, z: spawn.y + 2.5 } }}
+        isMovingRef={{ current: false }}
+        facingRef={{ current: -Math.PI / 2 }}
+        name="soojin"
+        field="BE"
+        emoji={activeEmojis.find(e => e.memberId === 'user2')?.emoji}
       />
 
       {/* 카메라 */}

@@ -13,6 +13,7 @@ interface MapRendererProps {
   onNearWell?:          () => void;
   onLeaveWell?:         () => void;
   onInteractBulletin?:  () => void;
+  onInteractCharacter?: ({ memberId }: { memberId: string }) => void;
   onFloorChange?:       (floor: number) => void;
 }
 
@@ -23,6 +24,7 @@ export function MapRenderer({
   onNearWell,
   onLeaveWell,
   onInteractBulletin,
+  onInteractCharacter,
   onFloorChange,
 }: MapRendererProps) {
   const [floorId,      setFloorId]      = useState(initialFloor ?? DEFAULT_FLOOR);
@@ -37,6 +39,7 @@ export function MapRenderer({
       mapEvents.on('NEAR_WELL',  () => onNearWell?.()),
       mapEvents.on('LEAVE_WELL', () => onLeaveWell?.()),
       mapEvents.on('INTERACT_BULLETIN', () => onInteractBulletin?.()),
+      mapEvents.on('INTERACT_CHARACTER', ({ memberId }) => onInteractCharacter?.({ memberId })),
 
       mapEvents.on('NEAR_OBJECT',  ({ label }) => setHintText(label)),
       mapEvents.on('LEAVE_OBJECT', ()           => setHintText('')),

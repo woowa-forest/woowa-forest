@@ -7,6 +7,7 @@ type MapEventHandlers = {
   INTERACT_PORTAL: (payload: { floorId: number }) => void;
   FLOOR_CHANGED: (payload: { toFloor: number }) => void;
   NEAR_CHARACTER: (payload: { memberId: string }) => void;
+  INTERACT_CHARACTER: (payload: { memberId: string }) => void;
 };
 
 type EventName = keyof MapEventHandlers;

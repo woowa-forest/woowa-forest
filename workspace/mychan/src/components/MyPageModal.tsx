@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../store/useAuthStore';
 import { useMemberRegistry } from '../store/useMemberRegistry';
 import { FIELD_LABEL, VILLAGE_LABEL } from '@shared/types/01-member';
+import { GithubHarvest } from '../economy/06-GithubHarvest';
+import { TransactionHistory } from '../economy/06-TransactionHistory';
 
 const spring = { type: 'spring' as const, stiffness: 340, damping: 28 };
 
@@ -10,12 +12,15 @@ interface Props {
   onClose: () => void;
 }
 
+type Tab = 'profile' | 'activity' | 'history';
+
 export function MyPageModal({ onClose }: Props) {
   const member        = useAuthStore(s => s.member);
   const updateBio     = useAuthStore(s => s.updateBio);
   const logout        = useAuthStore(s => s.logout);
   const updateMember  = useMemberRegistry(s => s.updateMember);
 
+  const [activeTab,  setActiveTab]  = useState<Tab>('profile');
   const [editingBio, setEditingBio] = useState(false);
   const [bioInput,   setBioInput]   = useState(member?.bio ?? '');
   const [saved,      setSaved]      = useState(false);
@@ -36,6 +41,12 @@ export function MyPageModal({ onClose }: Props) {
     FE: '#42A5F5',
     BE: '#FF8F00',
   };
+
+  const TABS: { id: Tab, label: string }[] = [
+    { id: 'profile', label: '프로필' },
+    { id: 'activity', label: '활동' },
+    { id: 'history', label: '내역' },
+  ];
 
   return (
     <motion.div
@@ -62,9 +73,12 @@ export function MyPageModal({ onClose }: Props) {
           background: 'rgba(30,18,8,0.98)',
           border: '2px solid #5c3d2e',
           borderRadius: 18,
-          width: 360,
+          width: 380,
+          height: 600,
           overflow: 'hidden',
           boxShadow: '0 24px 80px #000b, 0 0 0 1px #7a5540',
+          display: 'flex',
+          flexDirection: 'column',
         }}
         onClick={e => e.stopPropagation()}
       >
@@ -87,213 +101,235 @@ export function MyPageModal({ onClose }: Props) {
           >✕</motion.button>
         </div>
 
-        {/* 아바타 + 이름 */}
-        <div style={{ padding: '24px 24px 0', textAlign: 'center' }}>
-          <motion.div
-            animate={{ y: [0, -4, 0] }}
-            transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
-            style={{ fontSize: 52, marginBottom: 10 }}
-          >
-            🧑‍💻
-          </motion.div>
-          <div style={{ fontFamily: "'DotGothic16', monospace", fontSize: 20, color: '#FFF8E7', letterSpacing: 2 }}>
-            {member.crewName}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 8 }}>
-            <span style={{
-              background: FIELD_COLOR[member.field] + '22',
-              border: `1.5px solid ${FIELD_COLOR[member.field]}`,
-              color: FIELD_COLOR[member.field],
-              borderRadius: 20,
-              padding: '2px 12px',
-              fontFamily: "'DotGothic16', monospace",
-              fontSize: 11,
-            }}>
-              {member.field} · {FIELD_LABEL[member.field]}
-            </span>
-            <span style={{
-              background: '#c8a05e22',
-              border: '1.5px solid #c8a05e',
-              color: '#f5d580',
-              borderRadius: 20,
-              padding: '2px 12px',
-              fontFamily: "'DotGothic16', monospace",
-              fontSize: 11,
-            }}>
-              {VILLAGE_LABEL[member.village]}
-            </span>
-          </div>
+        {/* 탭 네비게이션 */}
+        <div style={{ display: 'flex', borderBottom: '1px solid #3d2010', background: 'rgba(0,0,0,0.2)' }}>
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                flex: 1,
+                padding: '12px 0',
+                background: 'none',
+                border: 'none',
+                borderBottom: activeTab === tab.id ? '2px solid #c8a05e' : '2px solid transparent',
+                fontFamily: "'DotGothic16', monospace",
+                fontSize: 13,
+                color: activeTab === tab.id ? '#f5d580' : '#8a6e5a',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {/* 정보 카드들 */}
-        <div style={{ padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-          {/* 우마 잔액 */}
-          <div style={{
-            background: '#2a1e0a',
-            border: '1.5px solid #5c3d2e',
-            borderRadius: 10,
-            padding: '12px 16px',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          }}>
-            <span style={{ fontFamily: "'DotGothic16', monospace", fontSize: 12, color: '#c8a878' }}>우마 잔액</span>
-            <span style={{ fontFamily: "'DotGothic16', monospace", fontSize: 16, color: '#f5d580' }}>
-              🪙 {member.wooMaBalance.toLocaleString()}
-            </span>
-          </div>
-
-          {/* GitHub */}
-          {member.githubId && (
-            <div style={{
-              background: '#1a2218',
-              border: '1.5px solid #3a5a30',
-              borderRadius: 10,
-              padding: '12px 16px',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            }}>
-              <span style={{ fontFamily: "'DotGothic16', monospace", fontSize: 12, color: '#81c784' }}>GitHub</span>
-              <span style={{ fontFamily: "'Noto Sans KR', sans-serif", fontSize: 12, color: '#a5d6a7' }}>
-                @{member.githubId}
-              </span>
-            </div>
-          )}
-
-          {/* 한 마디 */}
-          <div style={{
-            background: '#1e1208',
-            border: '1.5px solid #5c3d2e',
-            borderRadius: 10,
-            padding: '12px 16px',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontFamily: "'DotGothic16', monospace", fontSize: 12, color: '#c8a878' }}>한 마디</span>
-              <motion.button
-                onClick={() => { setEditingBio(v => !v); setBioInput(member.bio); }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                style={{
-                  background: editingBio ? '#3b1010' : '#2a3d1a',
-                  border: `1px solid ${editingBio ? '#ef5350' : '#4caf50'}`,
-                  color: editingBio ? '#ef9a9a' : '#81c784',
-                  borderRadius: 6,
-                  padding: '2px 10px',
-                  fontFamily: "'DotGothic16', monospace",
-                  fontSize: 10,
-                  cursor: 'pointer',
-                }}
+        {/* 컨텐츠 영역 */}
+        <div style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
+          <AnimatePresence mode="wait">
+            {activeTab === 'profile' && (
+              <motion.div
+                key="profile"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.15 }}
+                style={{ padding: '20px 24px' }}
               >
-                {editingBio ? '취소' : '수정'}
-              </motion.button>
-            </div>
-
-            <AnimatePresence mode="wait">
-              {editingBio ? (
-                <motion.div
-                  key="editing"
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.15 }}
-                >
-                  <textarea
-                    value={bioInput}
-                    onChange={e => setBioInput(e.target.value.slice(0, 100))}
-                    rows={2}
-                    autoFocus
-                    style={{
-                      width: '100%',
-                      background: '#0d0a06',
-                      border: '1.5px solid #5c3d2e',
-                      color: '#FFF8E7',
-                      padding: '8px 10px',
-                      borderRadius: 7,
-                      fontSize: 12,
-                      fontFamily: "'Noto Sans KR', sans-serif",
-                      outline: 'none',
-                      resize: 'none',
-                      lineHeight: 1.6,
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                    <span style={{ fontSize: 10, color: '#664' }}>{bioInput.length}/100</span>
-                    <motion.button
-                      onClick={saveBio}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95, y: 1 }}
-                      style={{
-                        background: '#4caf50',
-                        color: '#fff',
-                        border: '2px solid #2e7d32',
-                        borderRadius: 7,
-                        padding: '4px 14px',
-                        fontFamily: "'DotGothic16', monospace",
-                        fontSize: 11,
-                        cursor: 'pointer',
-                        boxShadow: '0 2px 0 #2e7d32',
-                      }}
-                    >
-                      저장
-                    </motion.button>
+                {/* 아바타 + 이름 */}
+                <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                  <motion.div
+                    animate={{ y: [0, -4, 0] }}
+                    transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
+                    style={{ fontSize: 52, marginBottom: 10 }}
+                  >
+                    🧑‍💻
+                  </motion.div>
+                  <div style={{ fontFamily: "'DotGothic16', monospace", fontSize: 20, color: '#FFF8E7', letterSpacing: 2 }}>
+                    {member.crewName}
                   </div>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="display"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  style={{
-                    fontFamily: "'Noto Sans KR', sans-serif",
-                    fontSize: 12,
-                    color: member.bio ? '#d4b896' : '#664',
-                    lineHeight: 1.6,
-                    fontStyle: member.bio ? 'normal' : 'italic',
-                  }}
-                >
-                  {member.bio || '아직 한 마디가 없어요 🌱'}
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 8 }}>
+                    <span style={{
+                      background: FIELD_COLOR[member.field] + '22',
+                      border: `1.5px solid ${FIELD_COLOR[member.field]}`,
+                      color: FIELD_COLOR[member.field],
+                      borderRadius: 20,
+                      padding: '2px 12px',
+                      fontFamily: "'DotGothic16', monospace",
+                      fontSize: 11,
+                    }}>
+                      {member.field}
+                    </span>
+                    <span style={{
+                      background: '#c8a05e22',
+                      border: '1.5px solid #c8a05e',
+                      color: '#f5d580',
+                      borderRadius: 20,
+                      padding: '2px 12px',
+                      fontFamily: "'DotGothic16', monospace",
+                      fontSize: 11,
+                    }}>
+                      {VILLAGE_LABEL[member.village]}
+                    </span>
+                  </div>
+                </div>
 
-            {/* 저장 완료 토스트 */}
-            <AnimatePresence>
-              {saved && (
-                <motion.div
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  style={{ fontSize: 10, color: '#81c784', marginTop: 4 }}
-                >
-                  ✓ 저장되었어요
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {/* 우마 잔액 */}
+                  <div style={{
+                    background: '#2a1e0a',
+                    border: '1.5px solid #5c3d2e',
+                    borderRadius: 10,
+                    padding: '12px 16px',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  }}>
+                    <span style={{ fontFamily: "'DotGothic16', monospace", fontSize: 12, color: '#c8a878' }}>우마 잔액</span>
+                    <span style={{ fontFamily: "'DotGothic16', monospace", fontSize: 16, color: '#f5d580' }}>
+                      🌿 {member.wooMaBalance.toLocaleString()}
+                    </span>
+                  </div>
 
-        {/* 로그아웃 */}
-        <div style={{ padding: '0 24px 20px', textAlign: 'center' }}>
-          <motion.button
-            onClick={() => { logout(); onClose(); }}
-            whileHover={{ scale: 1.03, backgroundColor: '#4a1810' }}
-            whileTap={{ scale: 0.97, y: 1 }}
-            style={{
-              background: '#3b1010',
-              color: '#ef9a9a',
-              border: '1.5px solid #ef5350',
-              borderRadius: 9,
-              padding: '9px 28px',
-              fontFamily: "'DotGothic16', monospace",
-              fontSize: 12,
-              cursor: 'pointer',
-              transition: 'background 0.15s',
-              letterSpacing: 1,
-            }}
-          >
-            숲에서 나가기
-          </motion.button>
+                  {/* 한 마디 */}
+                  <div style={{
+                    background: '#1e1208',
+                    border: '1.5px solid #5c3d2e',
+                    borderRadius: 10,
+                    padding: '12px 16px',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <span style={{ fontFamily: "'DotGothic16', monospace", fontSize: 12, color: '#c8a878' }}>한 마디</span>
+                      <motion.button
+                        onClick={() => { setEditingBio(v => !v); setBioInput(member.bio); }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        style={{
+                          background: editingBio ? '#3b1010' : '#2a3d1a',
+                          border: `1px solid ${editingBio ? '#ef5350' : '#4caf50'}`,
+                          color: editingBio ? '#ef9a9a' : '#81c784',
+                          borderRadius: 6,
+                          padding: '2px 10px',
+                          fontFamily: "'DotGothic16', monospace",
+                          fontSize: 10,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {editingBio ? '취소' : '수정'}
+                      </motion.button>
+                    </div>
+
+                    <AnimatePresence mode="wait">
+                      {editingBio ? (
+                        <motion.div key="editing" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}>
+                          <textarea
+                            value={bioInput}
+                            onChange={e => setBioInput(e.target.value.slice(0, 100))}
+                            rows={2} autoFocus
+                            style={{
+                              width: '100%', background: '#0d0a06', border: '1.5px solid #5c3d2e',
+                              color: '#FFF8E7', padding: '8px 10px', borderRadius: 7, fontSize: 12,
+                              fontFamily: "'Noto Sans KR', sans-serif", outline: 'none', resize: 'none',
+                              lineHeight: 1.6, boxSizing: 'border-box',
+                            }}
+                          />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                            <span style={{ fontSize: 10, color: '#664' }}>{bioInput.length}/100</span>
+                            <motion.button onClick={saveBio} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                              style={{
+                                background: '#4caf50', color: '#fff', border: '2px solid #2e7d32',
+                                borderRadius: 7, padding: '4px 14px', fontFamily: "'DotGothic16', monospace",
+                                fontSize: 11, cursor: 'pointer', boxShadow: '0 2px 0 #2e7d32',
+                              }}>저장</motion.button>
+                          </div>
+                        </motion.div>
+                      ) : (
+                        <motion.div key="display" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                          style={{
+                            fontFamily: "'Noto Sans KR', sans-serif", fontSize: 12,
+                            color: member.bio ? '#d4b896' : '#664', lineHeight: 1.6, fontStyle: member.bio ? 'normal' : 'italic',
+                          }}>
+                          {member.bio || '아직 한 마디가 없어요 🌱'}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 30, textAlign: 'center' }}>
+                  <motion.button
+                    onClick={() => { logout(); onClose(); }}
+                    whileHover={{ scale: 1.03, backgroundColor: '#4a1810' }}
+                    whileTap={{ scale: 0.97 }}
+                    style={{
+                      background: '#3b1010', color: '#ef9a9a', border: '1.5px solid #ef5350',
+                      borderRadius: 9, padding: '9px 24px', fontFamily: "'DotGothic16', monospace",
+                      fontSize: 11, cursor: 'pointer', transition: 'background 0.15s',
+                    }}
+                  >
+                    숲에서 나가기
+                  </motion.button>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'activity' && (
+              <motion.div
+                key="activity"
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                transition={{ duration: 0.15 }}
+                style={{ padding: '20px 24px' }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                  <GithubHarvest />
+                  
+                  <div style={{ borderTop: '1px solid #3d2010', paddingTop: 20 }}>
+                    <div style={{ fontSize: 11, color: '#8b4c10', fontWeight: 700, fontFamily: "'DotGothic16', monospace", marginBottom: 12 }}>
+                      ATTENDANCE STATUS
+                    </div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <div style={{ 
+                        flex: 1, background: '#1e1208', border: '1.5px solid #5c3d2e', 
+                        borderRadius: 10, padding: 12, textAlign: 'center' 
+                      }}>
+                        <div style={{ fontSize: 10, color: '#8a6e5a', marginBottom: 4 }}>출근 시간</div>
+                        <div style={{ color: '#f5d580', fontSize: 13, fontFamily: "'DotGothic16', monospace" }}>
+                          {useAuthStore.getState().attendance?.checkInAt 
+                            ? new Date(useAuthStore.getState().attendance!.checkInAt!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+                            : '--:--'}
+                        </div>
+                      </div>
+                      <div style={{ 
+                        flex: 1, background: '#1e1208', border: '1.5px solid #5c3d2e', 
+                        borderRadius: 10, padding: 12, textAlign: 'center' 
+                      }}>
+                        <div style={{ fontSize: 10, color: '#8a6e5a', marginBottom: 4 }}>퇴근 시간</div>
+                        <div style={{ color: '#f5d580', fontSize: 13, fontFamily: "'DotGothic16', monospace" }}>
+                          {useAuthStore.getState().attendance?.checkOutAt 
+                            ? new Date(useAuthStore.getState().attendance!.checkOutAt!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+                            : '--:--'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'history' && (
+              <motion.div
+                key="history"
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                transition={{ duration: 0.15 }}
+                style={{ padding: '20px 24px', height: '100%' }}
+              >
+                <TransactionHistory />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </motion.div>
     </motion.div>

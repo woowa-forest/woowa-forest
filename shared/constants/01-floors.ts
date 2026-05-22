@@ -12,3 +12,13 @@ export const FLOORS: Record<number, FloorConfig> = {
 
 export const FLOOR_IDS = [11, 12, 13] as const;
 export const DEFAULT_FLOOR = 12;
+
+export const POST_TAGS = {
+  QUESTION: '질문',
+  SHARE: '공유',
+  CHAT: '잡담',
+} as const;
+
+export const WOOMA_REWARD = {
+  ANSWER_ADOPTED: 2000,
+} as const;

@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { Billboard, Text } from '@react-three/drei';
 
+import { EmojiFloat } from '../interaction/EmojiFloat';
+
 const FIELD_COLORS: Record<string, string> = {
   AN:    '#4CAF50',
   FE:    '#42A5F5',
@@ -16,9 +18,10 @@ interface Character3DProps {
   facingRef: React.RefObject<number>; // rotation Y in radians
   name: string;
   field: string;
+  emoji?: string | null;
 }
 
-export function Character3D({ posRef, isMovingRef, facingRef, name, field }: Character3DProps) {
+export function Character3D({ posRef, isMovingRef, facingRef, name, field, emoji }: Character3DProps) {
   const groupRef    = useRef<THREE.Group>(null);
   const leftLegRef  = useRef<THREE.Mesh>(null);
   const rightLegRef = useRef<THREE.Mesh>(null);
@@ -118,6 +121,9 @@ export function Character3D({ posRef, isMovingRef, facingRef, name, field }: Cha
           {name}
         </Text>
       </Billboard>
+
+      {/* 이모지 반응 */}
+      {emoji && <EmojiFloat emoji={emoji} />}
     </group>
   );
 }
