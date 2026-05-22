@@ -14,6 +14,8 @@ import { Character3D } from './05-Character3D';
 import { mapEvents } from './mapEvents';
 import { useInteractionStore } from '../store/useInteractionStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { useMultiplayer, PlayerState } from '../hooks/useMultiplayer';
+import { supabase } from '../lib/supabaseClient';
 
 // ── 힌트 텍스트 ───────────────────────────────────────────────
 function hintText(type: string): string {
@@ -140,6 +142,32 @@ export function WorldScene({ floorId, playerName, playerField }: WorldSceneProps
   const spawn   = SPAWN_BY_FLOOR[floorId]   ?? { x: 22, y: 12 };
 
   const activeEmojis = useInteractionStore(s => s.activeEmojis);
+  const emitEmoji    = useInteractionStore(s => s.emitEmoji);
+  const addNearbyMsg = useInteractionStore(s => s.sendNearbyChat);
+
+  // 멀티플레이어 연동
+  const { players, updateState } = useMultiplayer(floorId, member?.id);
+
+  // 실시간 브로드캐스트 수신 (이모지 & 채팅)
+  useEffect(() => {
+    if (!supabase || !member) return;
+    const channel = supabase.channel(`floor-${floorId}-broadcast`);
+    channel
+      .on('broadcast', { event: 'emoji' }, ({ payload }) => {
+        if (payload.memberId !== member.id) {
+          emitEmoji(payload.memberId, payload.emoji);
+        }
+      })
+      .on('broadcast', { event: 'chat' }, ({ payload }) => {
+        if (payload.senderId !== member.id) {
+          // 로컬 스토어에 추가하여 화면에 표시
+          addNearbyMsg(payload.roomId, payload.senderId, payload.senderName, payload.content);
+        }
+      })
+      .subscribe();
+
+    return () => { channel.unsubscribe(); };
+  }, [floorId, member, emitEmoji, addNearbyMsg]);
 
   const tileMap        = useMemo(() => buildTileMap(floorId), [floorId]);
   const posRef         = useRef({ x: spawn.x + 0.5, z: spawn.y + 0.5 });
@@ -213,6 +241,18 @@ export function WorldScene({ floorId, playerName, playerField }: WorldSceneProps
 
       if (canOccupy(tileMap, nx, cz)) posRef.current.x = nx;
       if (canOccupy(tileMap, posRef.current.x, nz)) posRef.current.z = nz;
+
+      // 위치 동기화 전송 (Supabase Presence)
+      if (member) {
+        updateState({
+          memberId: member.id,
+          name:     playerName,
+          field:    playerField,
+          x:        posRef.current.x,
+          z:        posRef.current.z,
+          facing:   facingRef.current,
+        });
+      }
     }
 
     // ── 계단 자동 이동 ────────────────────────────────────────
@@ -240,15 +280,12 @@ export function WorldScene({ floorId, playerName, playerField }: WorldSceneProps
     let minDist = Infinity;
 
     // 1. 캐릭터 감지 우선
-    const demoCharacters = [
-      { id: 'user1', name: 'snowshower', x: spawn.x + 3.5, z: spawn.y + 0.5 },
-      { id: 'user2', name: 'soojin', x: spawn.x + 3.5, z: spawn.y + 2.5 },
-    ];
+    const otherPlayers = Object.values(players);
     let nearChar = null;
-    for (const char of demoCharacters) {
+    for (const char of otherPlayers) {
       const dist = Math.sqrt((tx - char.x) ** 2 + (tz - char.z) ** 2);
       if (dist <= INTERACTION_CONFIG.CHARACTER_INTERACT_RADIUS) {
-        nearChar = char;
+        nearChar = { id: char.memberId, name: char.name };
         break;
       }
     }
@@ -338,23 +375,18 @@ export function WorldScene({ floorId, playerName, playerField }: WorldSceneProps
         emoji={activeEmojis.find(e => e.memberId === member?.id)?.emoji || undefined}
       />
 
-      {/* 다른 크루들 (데모용 고정 위치) */}
-      <Character3D
-        posRef={{ current: { x: spawn.x + 3.5, z: spawn.y + 0.5 } }}
-        isMovingRef={{ current: false }}
-        facingRef={{ current: -Math.PI / 2 }}
-        name="snowshower"
-        field="BE"
-        emoji={activeEmojis.find(e => e.memberId === 'user1')?.emoji || undefined}
-      />
-      <Character3D
-        posRef={{ current: { x: spawn.x + 3.5, z: spawn.y + 2.5 } }}
-        isMovingRef={{ current: false }}
-        facingRef={{ current: -Math.PI / 2 }}
-        name="soojin"
-        field="BE"
-        emoji={activeEmojis.find(e => e.memberId === 'user2')?.emoji || undefined}
-      />
+      {/* 다른 크루들 (Supabase에서 받아온 실시간 플레이어들) */}
+      {Object.values(players).map((p) => (
+        <Character3D
+          key={p.memberId}
+          posRef={{ current: { x: p.x, z: p.z } } as any}
+          isMovingRef={{ current: false } as any}
+          facingRef={{ current: p.facing } as any}
+          name={p.name}
+          field={p.field}
+          emoji={activeEmojis.find(e => e.memberId === p.memberId)?.emoji || undefined}
+        />
+      ))}
 
       {/* 카메라 */}
       <CameraRig posRef={posRef} />

@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { RealtimeChannel } from '@supabase/supabase-js';
+import { useAuthStore } from '../store/useAuthStore';
 
 export interface PlayerState {
   memberId: string;
@@ -11,26 +13,42 @@ export interface PlayerState {
   emoji?: string | null;
 }
 
-export function useMultiplayer(floorId: number, currentMember: PlayerState | null) {
+export function useMultiplayer(floorId: number, currentMemberId: string | undefined) {
   const [players, setPlayers] = useState<Record<string, PlayerState>>({});
+  const roomRef = useRef<RealtimeChannel | null>(null);
+
+  const updateState = useCallback(async (state: PlayerState) => {
+    if (roomRef.current && roomRef.current.state === 'joined') {
+      await roomRef.current.track(state);
+    }
+  }, []);
+
+  const sendBroadcast = useCallback((event: string, payload: any) => {
+    if (roomRef.current && roomRef.current.state === 'joined') {
+      roomRef.current.send({
+        type: 'broadcast',
+        event,
+        payload
+      });
+    }
+  }, []);
 
   useEffect(() => {
-    if (!supabase || !currentMember) return;
+    if (!supabase || !currentMemberId) return;
 
-    // 1. 특정 층(floor) 단위로 Room 생성
     const room = supabase.channel(`floor-${floorId}`, {
       config: {
-        presence: { key: currentMember.memberId },
+        presence: { key: currentMemberId },
       },
     });
+    roomRef.current = room;
 
-    // 2. 다른 유저들의 접속 상태 및 위치(Presence) 수신
     room.on('presence', { event: 'sync' }, () => {
       const state = room.presenceState();
       const newPlayers: Record<string, PlayerState> = {};
       
       Object.keys(state).forEach((key) => {
-        if (key !== currentMember.memberId) {
+        if (key !== currentMemberId) {
           const userStates = state[key] as any[];
           if (userStates && userStates.length > 0) {
             newPlayers[key] = userStates[0] as PlayerState;
@@ -40,32 +58,26 @@ export function useMultiplayer(floorId: number, currentMember: PlayerState | nul
       setPlayers(newPlayers);
     });
 
-    // 3. 브로드캐스트 수신 (채팅, 이모지 등 짧은 이벤트)
-    room.on('broadcast', { event: 'emoji' }, ({ payload }) => {
-      console.log(`[이모지 수신] ${payload.memberId}: ${payload.emoji}`);
-      // 여기서 Zustand 스토어의 emitEmoji 등을 호출하여 렌더링에 반영할 수 있습니다.
-    });
-
-    // 4. 채널 구독 및 내 상태 전송 시작
     room.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
-        // 첫 접속 시 내 상태 전송
-        await room.track(currentMember);
+        const member = useAuthStore.getState().member;
+        if (member) {
+          await room.track({
+            memberId: member.id,
+            name: member.crewName,
+            field: member.field,
+            x: 22.5, z: 12.5,
+            facing: 0
+          });
+        }
       }
     });
 
-    // 5. 내 위치가 바뀔 때마다 서버로 상태 업데이트 (throttle 필요)
-    const updateMyPosition = async () => {
-      if (room.state === 'joined') {
-        await room.track(currentMember);
-      }
-    };
-    
-    // 컴포넌트가 언마운트되거나 층을 이동하면 채널 나가기
     return () => {
       room.unsubscribe();
+      roomRef.current = null;
     };
-  }, [floorId]); // currentMember 전체를 넣으면 무한루프가 될 수 있으므로 최적화 필요
+  }, [floorId, currentMemberId]);
 
-  return { players };
+  return { players, updateState, sendBroadcast };
 }
