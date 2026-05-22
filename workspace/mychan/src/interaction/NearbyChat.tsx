@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useInteractionStore } from '../store/useInteractionStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { INTERACTION_CONFIG } from '@shared/constants/03-interaction';
-import { supabase } from '../lib/supabaseClient';
+import { mapEvents } from '../map/mapEvents';
 
 const spring = { type: 'spring' as const, stiffness: 400, damping: 30 };
 
@@ -30,16 +30,12 @@ export function NearbyChat({ floorId }: Props) {
     // 1. 로컬에 즉시 표시
     sendNearbyChat(roomId, member.id, member.crewName, content);
     
-    // 2. Supabase 브로드캐스트 전송
-    supabase?.channel(`floor-${floorId}-broadcast`).send({
-      type: 'broadcast',
-      event: 'chat',
-      payload: {
-        roomId,
-        senderId: member.id,
-        senderName: member.crewName,
-        content
-      }
+    // 2. WorldScene을 통해 Supabase 브로드캐스트 요청
+    mapEvents.emit('REQUEST_CHAT_BROADCAST', {
+      roomId,
+      senderId: member.id,
+      senderName: member.crewName,
+      content
     });
 
     setInput('');

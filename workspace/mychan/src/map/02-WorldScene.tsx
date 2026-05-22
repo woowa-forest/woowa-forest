@@ -145,29 +145,25 @@ export function WorldScene({ floorId, playerName, playerField }: WorldSceneProps
   const emitEmoji    = useInteractionStore(s => s.emitEmoji);
   const addNearbyMsg = useInteractionStore(s => s.sendNearbyChat);
 
-  // 멀티플레이어 연동
-  const { players, updateState } = useMultiplayer(floorId, member?.id);
+  // 멀티플레이어 연동 (모든 실시간 통신은 이 안에서 처리됨)
+  const { players, updateState, sendBroadcast } = useMultiplayer(floorId, member?.id);
 
-  // 실시간 브로드캐스트 수신 (이모지 & 채팅)
   useEffect(() => {
-    if (!supabase || !member) return;
-    const channel = supabase.channel(`floor-${floorId}-broadcast`);
-    channel
-      .on('broadcast', { event: 'emoji' }, ({ payload }) => {
-        if (payload.memberId !== member.id) {
-          emitEmoji(payload.memberId, payload.emoji);
-        }
-      })
-      .on('broadcast', { event: 'chat' }, ({ payload }) => {
-        if (payload.senderId !== member.id) {
-          // 로컬 스토어에 추가하여 화면에 표시
-          addNearbyMsg(payload.roomId, payload.senderId, payload.senderName, payload.content);
-        }
-      })
-      .subscribe();
+    if (!member) return;
+    
+    // UI 컴포넌트들로부터 전송 요청을 받아 Supabase로 전달
+    const unsubChat = mapEvents.on('REQUEST_CHAT_BROADCAST', (payload) => {
+      sendBroadcast('chat', payload);
+    });
+    const unsubEmoji = mapEvents.on('REQUEST_EMOJI_BROADCAST', (payload) => {
+      sendBroadcast('emoji', payload);
+    });
 
-    return () => { channel.unsubscribe(); };
-  }, [floorId, member, emitEmoji, addNearbyMsg]);
+    return () => {
+      unsubChat();
+      unsubEmoji();
+    };
+  }, [member, sendBroadcast]);
 
   const tileMap        = useMemo(() => buildTileMap(floorId), [floorId]);
   const posRef         = useRef({ x: spawn.x + 0.5, z: spawn.y + 0.5 });

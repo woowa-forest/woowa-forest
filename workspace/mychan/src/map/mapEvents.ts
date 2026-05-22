@@ -8,6 +8,8 @@ type MapEventHandlers = {
   FLOOR_CHANGED: (payload: { toFloor: number }) => void;
   NEAR_CHARACTER: (payload: { memberId: string }) => void;
   INTERACT_CHARACTER: (payload: { memberId: string }) => void;
+  REQUEST_CHAT_BROADCAST: (payload: { roomId: string; senderId: string; senderName: string; content: string }) => void;
+  REQUEST_EMOJI_BROADCAST: (payload: { memberId: string; emoji: string }) => void;
 };
 
 type EventName = keyof MapEventHandlers;

@@ -3,7 +3,7 @@ import { EMOJI_LIST } from '@shared/constants/03-interaction';
 import { useInteractionStore } from '../store/useInteractionStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { mapEvents } from '../map/mapEvents';
 
 interface Props {
   onEmoji?: (emoji: typeof EMOJI_LIST[number]) => void;
@@ -20,15 +20,10 @@ export function EmojiPalette({ onEmoji }: Props) {
     emitEmoji(member.id, emoji);
     onEmoji?.(emoji);
 
-    // 2. 브로드캐스트 전송 (현재 층 채널을 찾기 위해 App.tsx 등의 상태를 활용하거나 직접 채널 생성)
-    // 간단히 하기 위해 전역 채널 또는 명명 규칙 활용
-    const floorId = useAuthStore.getState().member?.village; // 혹은 현재 위치한 층 정보 필요
-    // 실제로는 현재 캐릭터가 있는 층 정보가 필요함. 
-    // 여기서는 우선 브로드캐스트 전송 로직만 추가.
-    supabase?.channel(`floor-all-broadcast`).send({
-      type: 'broadcast',
-      event: 'emoji',
-      payload: { memberId: member.id, emoji }
+    // 2. WorldScene을 통해 Supabase 브로드캐스트 요청
+    mapEvents.emit('REQUEST_EMOJI_BROADCAST', {
+      memberId: member.id,
+      emoji
     });
   };
 
